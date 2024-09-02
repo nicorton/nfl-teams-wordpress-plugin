@@ -34,9 +34,9 @@ if (!class_exists('nflPlugin')){
     // $nflPlugin -> initialize(); // run the initialize method once class has been instantiated
  }
 
- function fetch_json_from_api($atts) {
-   // Get the search query from the URL (if provided)
-   $search_query = isset($_GET['search']) ? sanitize_text_field($_GET['search']) : '';
+ function fetch_and_search_teams() {
+   // Get the search query from the URL parameters
+   $search_query = isset($_GET['team_name']) ? sanitize_text_field($_GET['team_name']) : '';
 
    $api_url = 'https://delivery.oddsandstats.co/team_list/NFL.JSON?api_key=74db8efa2a6db279393b433d97c2bc843f8e32b0';
 
@@ -54,36 +54,45 @@ if (!class_exists('nflPlugin')){
    // Decode the JSON string into an array
    $data = json_decode($body, true);
 
-   // Ensure that 'results' and the necessary structure exist
-   if (isset($data['results']) && is_array($data['results'])) {
-       $filtered_data = array_filter($data['results'], function($item) use ($search_query) {
-           return isset($item['data']['team']['name']) && stripos($item['data']['team']['name'], $search_query) !== false;
-       });
-   } else {
-       $filtered_data = []; // Default to an empty array if the structure isn't as expected
+   // Check if data is present
+   if (empty($data['results']['data']['team'])) {
+       return 'No team data found.';
    }
 
-   // Re-encode the array with pretty print formatting
-   $pretty_json = json_encode($filtered_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+   // Initialize an empty string to hold the output
+   $output = '<ul>';
 
-   // Build the search form
-   $search_form = '<form method="get" action="">
-       <input type="text" name="search" value="' . esc_attr($search_query) . '" placeholder="Search by team name">
-       <input type="submit" value="Search">
-   </form>';
+   // Filter and build the output string based on the search query
+   foreach ($data['results']['data']['team'] as $team) {
+       if (stripos($team['name'], $search_query) !== false || stripos($team['nickname'], $search_query) !== false) {
+           $output .= '<li>';
+           $output .= '<strong>Team Name:</strong> ' . esc_html($team['name']) . '<br>';
+           $output .= '<strong>Team Nickname:</strong> ' . esc_html($team['nickname']) . '<br>';
+           $output .= '<strong>Conference:</strong> ' . esc_html($team['conference']) . '<br>';
+           $output .= '<strong>Division:</strong> ' . esc_html($team['division']) . '<br>';
+           $output .= '</li><br>';
+       }
+   }
 
-   // Return the search form and the formatted JSON content as a string
-   return $search_form . '<pre>' . esc_html($pretty_json) . '</pre>';
+   $output .= '</ul>';
+
+   // If no teams match the search query
+   if (empty($output)) {
+       $output = 'No teams found matching your search query.';
+   }
+
+   // Add a search form above the results
+   $form = '<form method="GET">
+               <label for="team_name">Search for a team: </label>
+               <input type="text" name="team_name" id="team_name" value="' . esc_attr($search_query) . '">
+               <input type="submit" value="Search">
+            </form><br>';
+
+   // Return the search form and the filtered list
+   return $form . $output;
 }
 
-add_shortcode('fetch_api_data', 'fetch_json_from_api');
-
-
-
-
-
-
-
+add_shortcode('fetch_api_data', 'fetch_and_search_teams');
 
 
 
